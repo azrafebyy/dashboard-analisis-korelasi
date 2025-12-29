@@ -4,16 +4,21 @@ from scipy.stats import pearsonr
 import plotly.express as px
 import os
 import google.generativeai as genai
+from pathlib import Path
 
 # Load custom CSS
-def load_css(path="style.css"):
-    try:
-        with open(path) as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    except FileNotFoundError:
-        st.warning("style.css belum ditemukan. Pastikan file ada di folder yang sama dengan app.py")
+def load_css(filename="style.css"):
+    base_dir = Path(__file__).parent
+    css_path = base_dir / filename
 
-load_css()  # Panggil untuk load CSS
+    if css_path.exists():
+        with open(css_path, "r", encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    else:
+        st.warning(f"{filename} belum ditemukan di folder korelasi")
+
+# Panggil untuk load CSS
+load_css()
 
 st.set_page_config(page_title="Dashboard Analisis Korelasi", page_icon="📊")
 st.title("Dashboard Analisis Korelasi")
