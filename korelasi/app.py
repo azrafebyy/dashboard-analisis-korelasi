@@ -20,11 +20,9 @@ def load_css(filename="style.css"):
 # Panggil untuk load CSS
 load_css()
 
-st.write("CSS path:", css_path)
-
 st.set_page_config(page_title="Dashboard Analisis Korelasi", page_icon="📊")
 st.title("Dashboard Analisis Korelasi")
-
+st.write("CSS path:", css_path)
 # -------------------------
 # Gemini helpers
 # -------------------------
