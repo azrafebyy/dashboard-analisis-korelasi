@@ -22,7 +22,6 @@ load_css()
 
 st.set_page_config(page_title="Dashboard Analisis Korelasi", page_icon="📊")
 st.title("Dashboard Analisis Korelasi")
-st.write("CSS path:", css_path)
 # -------------------------
 # Gemini helpers
 # -------------------------
