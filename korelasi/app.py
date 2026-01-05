@@ -6,22 +6,36 @@ import os
 import google.generativeai as genai
 from pathlib import Path
 
-# Load custom CSS
-def load_css(filename="style.css"):
-    base_dir = Path(__file__).parent
-    css_path = base_dir / filename
 
-    if css_path.exists():
-        with open(css_path, "r", encoding="utf-8") as f:
-            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    else:
-        st.warning(f"{filename} belum ditemukan di folder korelasi")
+st.markdown("""
+    <style>
+    .stButton > button {
+    background-color: #4CAF50;
+    border: 1px;
+    }
 
-# Panggil untuk load CSS
-load_css()
+    .stButton > button:hover {
+    background-color: #45a049;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.set_page_config(page_title="Dashboard Analisis Korelasi", page_icon="📊")
+st.set_page_config(page_title="Dashboard Analisis Korelasi",
+                   page_icon="📊",
+                   layout="wide")
 st.title("Dashboard Analisis Korelasi")
+
+with st.sidebar:
+    st.subheader("📌 Tentang Dashboard")
+
+    st.markdown("""
+    Dashboard ini digunakan untuk menganalisis hubungan antar variabel numerik, 
+    menghitung korelasi Pearson, menampilkan visualisasi hubungan data, dan menentukan signifikansi statistik
+    """)
+
+    st.subheader("📑 Upload Dataset")
+    file1 = st.file_uploader("Upload CSV atau Excel (Data 1)", type=["csv", "xlsx"])
+    file2 = st.file_uploader("Upload CSV atau Excel (Data 2)", type=["csv", "xlsx"])
 # -------------------------
 # Gemini helpers
 # -------------------------
@@ -90,8 +104,6 @@ Gunakan Bahasa Indonesia yang jelas dan singkat.
 # -------------------------
 # Upload file
 # -------------------------
-file1 = st.file_uploader("Upload CSV atau Excel (Data 1)", type=["csv", "xlsx"])
-file2 = st.file_uploader("Upload CSV atau Excel (Data 2)", type=["csv", "xlsx"])
 
 def read_file(f):
     return pd.read_csv(f) if f.name.endswith("csv") else pd.read_excel(f)
@@ -101,64 +113,57 @@ if file1 and file2:
         df1 = read_file(file1)
         df2 = read_file(file2)
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("📥 Input Data")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            column_x = st.selectbox("Pilih Kolom untuk X (Data 1)", df1.columns)
-        with c2:
-            column_y = st.selectbox("Pilih Kolom untuk Y (Data 2)", df2.columns)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
         # Cek apakah jumlah baris sama
         if len(df1) != len(df2):
             st.error("Jumlah baris Data 1 dan Data 2 tidak sama. Pastikan jumlah baris dan kolom antar 2 data sesuai.")
             st.stop()
 
-        # Paksa numeric + buang NaN pasangan
-        x = pd.to_numeric(df1[column_x], errors="coerce")
-        y = pd.to_numeric(df2[column_y], errors="coerce")
-        valid = pd.DataFrame({"x": x, "y": y}).dropna()
+        st.subheader("📝 Ringkasan Korelasi")
+        col = st.columns((0.8, 2), gap='medium')
+        with col[0]:
+            column_x = st.selectbox("Pilih Kolom untuk X (Data 1)", df1.columns)
+            column_y = st.selectbox("Pilih Kolom untuk Y (Data 2)", df2.columns)
 
-        if len(valid) < 2:
-            st.error("Jumlah data yang bisa dianalisis terlalu sedikit setelah menghapus data yang kosong atau tidak valid (minimal 2 data).")
-            st.stop()
+            # Paksa numeric + buang NaN pasangan
+            x = pd.to_numeric(df1[column_x], errors="coerce")
+            y = pd.to_numeric(df2[column_y], errors="coerce")
+            valid = pd.DataFrame({"x": x, "y": y}).dropna()
+        
+        with col[1]:
+            if len(valid) < 2:
+                st.error("Jumlah data yang bisa dianalisis terlalu sedikit setelah menghapus data yang kosong atau tidak valid (minimal 2 data).")
+                st.info(f"Data valid dipakai: {len(valid)} dari {len(df1)} baris. "
+                    f"Missing/invalid total: {(x.isna().sum() + y.isna().sum())}")
+                st.stop()
 
+            # Korelasi Pearson
+            correlation, p_value = pearsonr(valid["x"], valid["y"])
+            strength = corr_strength(correlation)
 
-        # Korelasi Pearson
-        correlation, p_value = pearsonr(valid["x"], valid["y"])
-        strength = corr_strength(correlation)
+            colm = st.columns((0.8, 0.8, 1), gap='small')
+            with colm[0]:
+                st.container(border=True).metric("Koefisien (r)", f"{correlation:.3f}")
+            with colm[1]:
+                st.container(border=True).metric("P-value", f"{p_value:.4f}")
+            with colm[2]:
+                st.container(border=True).metric("Kekuatan", strength)
 
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("📊 Ringkasan Korelasi")
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Koefisien (r)", f"{correlation:.3f}")
-        m2.metric("P-value", f"{p_value:.4f}")
-        m3.metric("Kekuatan", strength)
-
-        st.write("Status:", "✅ Signifikan" if p_value < 0.05 else "⚠️ Tidak signifikan")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.info(f"Data valid dipakai: {len(valid)} dari {len(df1)} baris. "
-                f"Missing/invalid total: {(x.isna().sum() + y.isna().sum())}")
+            if p_value < 0.05:
+                st.success("✅ Korelasi signifikan secara statistik (α = 0.05)")
+            else:
+                st.warning("⚠️ Korelasi tidak signifikan secara statistik (α = 0.05)")
 
         # Scatter plot
         fig = px.scatter(
             valid, x="x", y="y",
             labels={"x": column_x, "y": column_y},
-            title="Scatter Plot (Data valid)"
         )
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("📈 Scatter Plot")
         st.plotly_chart(fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
         # -------------------------
         # Insight AI
         # -------------------------
-        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.subheader("🤖 Analisis AI")
 
         client = get_gemini_client()
@@ -174,18 +179,12 @@ if file1 and file2:
             "catatan": "Asumsi: Data 1 dan Data 2 sejajar berdasarkan urutan baris. Jika ada ID/tanggal, lebih valid merge by key."
         }
 
-        st.write("DEBUG: Sampai Analisis AI ✅")
-        st.write("DEBUG: Gemini client aktif?", client is not None)
-
         if st.button("Generate AI"):
             with st.spinner("AI sedang menganalisis..."):
                 insight = generate_ai_insight(client, context)
             st.markdown(insight)
 
-        st.markdown('</div>', unsafe_allow_html=True)
-
     except Exception as e:
         st.error(f"Terjadi kesalahan dalam memproses file: {e}")
 else:
-    st.info("Upload dua file untuk mulai analisis.")
-
+    st.info("📌 Silakan unggah dua dataset pada sidebar untuk melihat hasil analisis.")
